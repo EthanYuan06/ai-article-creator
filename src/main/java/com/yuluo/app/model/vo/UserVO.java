@@ -9,13 +9,12 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 登录用户视图
- *
+ * 用户视图对象
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginUserVO implements Serializable {
+public class UserVO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -24,11 +23,6 @@ public class LoginUserVO implements Serializable {
      * id
      */
     private Long id;
-
-    /**
-     * 用户账户
-     */
-    private String userAccount;
 
     /**
      * 用户昵称
