@@ -21,6 +21,7 @@ import com.yuluo.app.service.UserService;
 import com.yuluo.app.util.CosUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,6 +36,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Resource
     private CosUtil cosUtil;
+
+    @Value("${PASSWORD_SALT}")
+    private String salt;
 
     /**
      * 用户注册
@@ -240,8 +244,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public String getEncryptPassword(String userPassword) {
-        final String SALT = "Subaru";
-        return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        return DigestUtils.md5DigestAsHex((salt + userPassword).getBytes());
     }
 
     /**
@@ -296,6 +299,34 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     /**
+     * 上传用户头像
+     *
+     * @param file   上传的文件
+     * @param userId 用户ID
+     * @return 上传成功状态
+     */
+    @Override
+    public boolean uploadAvatar(MultipartFile file, Long userId) {
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID不能为空");
+        
+        // 1. 构建上传路径
+        String uploadPathPrefix = "avatar/" + userId;
+        
+        // 2. 调用COS工具类上传
+        String url = cosUtil.uploadPicture(file, uploadPathPrefix);
+
+        // 3. 更新数据库
+        User user = new User();
+        user.setId(userId);
+        user.setUserAvatar(url);
+        boolean result = updateById(user);
+        if (!result){
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新头像失败");
+        }
+        return true;
+    }
+
+    /**
      * 构建查询条件
      *
      * @param userQueryRequest 查询参数
@@ -303,17 +334,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     private QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest) {
         QueryWrapper queryWrapper = new QueryWrapper();
-        
+
         // 模糊查询用户昵称
         if (StrUtil.isNotBlank(userQueryRequest.getUserName())) {
             queryWrapper.like("userName", userQueryRequest.getUserName());
         }
-        
+
         // 精确查询用户角色
         if (StrUtil.isNotBlank(userQueryRequest.getUserRole())) {
             queryWrapper.eq("userRole", userQueryRequest.getUserRole());
         }
-        
+
         // 排序处理
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
@@ -324,7 +355,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             // 默认按创建时间降序
             queryWrapper.orderBy("createTime", false);
         }
-        
+
         return queryWrapper;
     }
 
@@ -357,33 +388,4 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         BeanUtil.copyProperties(user, userVO);
         return userVO;
     }
-
-    /**
-     * 上传用户头像
-     *
-     * @param file   上传的文件
-     * @param userId 用户ID
-     * @return 上传成功状态
-     */
-    @Override
-    public boolean uploadAvatar(MultipartFile file, Long userId) {
-        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID不能为空");
-        
-        // 1. 构建上传路径
-        String uploadPathPrefix = "avatar/" + userId;
-        
-        // 2. 调用COS工具类上传
-        String url = cosUtil.uploadPicture(file, uploadPathPrefix);
-
-        // 3. 更新数据库
-        User user = new User();
-        user.setId(userId);
-        user.setUserAvatar(url);
-        boolean result = updateById(user);
-        if (!result){
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新头像失败");
-        }
-        return true;
-    }
-
 }
