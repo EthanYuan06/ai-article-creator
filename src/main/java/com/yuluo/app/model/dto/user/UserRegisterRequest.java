@@ -1,4 +1,4 @@
-package com.yuluo.app.model.dto;
+package com.yuluo.app.model.dto.user;
 import lombok.Data;
 import java.io.Serializable;
 

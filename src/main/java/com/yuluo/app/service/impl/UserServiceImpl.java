@@ -10,15 +10,15 @@ import com.yuluo.app.exception.BusinessException;
 import com.yuluo.app.exception.ErrorCode;
 import com.yuluo.app.exception.ThrowUtils;
 import com.yuluo.app.mapper.UserMapper;
-import com.yuluo.app.model.dto.UserAddRequest;
-import com.yuluo.app.model.dto.UserQueryRequest;
-import com.yuluo.app.model.dto.UserUpdateRequest;
+import com.yuluo.app.model.dto.user.UserAddRequest;
+import com.yuluo.app.model.dto.user.UserQueryRequest;
+import com.yuluo.app.model.dto.user.UserUpdateRequest;
 import com.yuluo.app.model.entity.User;
 import com.yuluo.app.model.enums.UserRoleEnum;
 import com.yuluo.app.model.vo.LoginUserVO;
 import com.yuluo.app.model.vo.UserVO;
 import com.yuluo.app.service.UserService;
-import com.yuluo.app.util.CosUtil;
+import com.yuluo.app.util.CosUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +35,7 @@ import static com.yuluo.app.constant.UserConstant.USER_LOGIN_STATE;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Resource
-    private CosUtil cosUtil;
+    private CosUtils cosUtils;
 
     @Value("${PASSWORD_SALT}")
     private String salt;
@@ -313,7 +313,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String uploadPathPrefix = "avatar/" + userId;
         
         // 2. 调用COS工具类上传
-        String url = cosUtil.uploadPicture(file, uploadPathPrefix);
+        String url = cosUtils.uploadPicture(file, uploadPathPrefix);
 
         // 3. 更新数据库
         User user = new User();

@@ -24,7 +24,7 @@ import java.util.List;
  */
 @Slf4j
 @Component
-public class CosUtil {
+public class CosUtils {
 
     @Resource
     private CosClientConfig cosClientConfig;

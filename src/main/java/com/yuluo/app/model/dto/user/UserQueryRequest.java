@@ -1,4 +1,4 @@
-package com.yuluo.app.model.dto;
+package com.yuluo.app.model.dto.user;
 
 import com.yuluo.app.common.PageRequest;
 import lombok.Data;
