@@ -1,9 +1,12 @@
 package com.yuluo.app.model.enums;
 
 import lombok.Getter;
-// todo 理解消息状态枚举类
+
 /**
  * SSE 消息类型枚举
+ * <P>
+ * 前端需要根据 SSE 消息类型来更新不同的 UI区域
+ * 比如收到 IMAGE_COMPLETE 消息时，前端需要更新配图区域
  */
 @Getter
 public enum SseMessageTypeEnum {

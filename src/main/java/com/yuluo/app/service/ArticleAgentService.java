@@ -15,6 +15,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -23,6 +24,12 @@ public class ArticleAgentService {
 
     @Resource
     private DashScopeChatModel chatModel;
+
+    @Resource
+    private CosService cosService;
+
+    @Resource
+    private ImageSearchService imageSearchService;
 
     /**
      * 生成文章流程
@@ -137,13 +144,65 @@ public class ArticleAgentService {
      * 生成配图
      */
     private void generateImages(ArticleState state, Consumer<String> streamHandler) {
-
+        // 创建配图结果列表
+        List<ArticleState.ImageResult> imageResults = new ArrayList<>();
+        // 遍历配图需求列表，开始进行图片检索
+        for (ArticleState.ImageRequirement requirement : state.getImageRequirements()) {
+            log.info("智能体5：开始配图。position = {}, keywords = {}",
+                    requirement.getPosition(), requirement.getKeywords());
+            // 调用图片检索服务
+            // todo 图片搜索实现类待开发
+            String imageUrl = imageSearchService.searchImage(requirement.getKeywords());
+            // 降级策略：如果搜不到图片，则记录当前检索方案，然后使用PICSUM随机图片进行占位
+            ImageMethodEnum method = imageSearchService.getMethod();
+            if (imageUrl == null){
+                imageUrl = imageSearchService.getFallbackImage(requirement.getPosition());
+                method = ImageMethodEnum.PICSUM;
+                log.warn("图片检索失败，使用降级策略，position = {}", requirement.getPosition());
+            }
+            // 使用图片直接URL
+            // todo 后期升级为 COS 上传服务
+            String finalImageUrl = cosService.useDirectUrl(imageUrl);
+            // 创建配图结果
+            ArticleState.ImageResult imageResult = buildImageResult(requirement, finalImageUrl, method);
+            imageResults.add(imageResult);
+            // 单张配图完成，推送给用户
+            String imageCompleteMessage = SseMessageTypeEnum.IMAGE_COMPLETE.getStreamingPrefix()
+                    + GsonUtils.toJson(imageResult);
+            streamHandler.accept(imageCompleteMessage);
+            log.info("智能体5：配图检索成功。position = {}, method = {}", requirement.getPosition(), method.getValue());
+        }
+        state.setImages(imageResults);
+        log.info("智能体5：所有配图生成成功。数量：{}", imageResults.size());
     }
 
     /**
      * 合并配图和正文
      */
+    // todo 当前插入策略比较直接，后期待优化
     private void mergeImagesIntoContent(ArticleState state) {
+        // 拿到正文和图片列表
+        String content = state.getContent();
+        List<ArticleState.ImageResult> images = state.getImages();
+        // 如果图片列表为空，直接返回纯文本正文，结束方法
+        if (images == null || images.isEmpty()) {
+            state.setFullContent(content);
+            return;
+        }
+        StringBuilder fullContent = new StringBuilder();
+        // 按行处理正文
+        String[] lines = content.split("\n");
+        for (String line : lines) {
+            // 将当前一行文字拼接到 fullContent 中
+            fullContent.append(line).append("\n");
+            // 判断当前行是否为章节二级标题
+            if (line.startsWith("## ")){
+                // 去掉“## ”与章节标题开头结尾空白，拿到纯文本
+                String sectionTitle = line.substring(3).trim();
+                // 在章节标题之后插入图片
+                insertImageAfterSection(fullContent, images, sectionTitle);
+            }
+        }
     }
 
     // region 辅助方法
@@ -180,6 +239,9 @@ public class ArticleAgentService {
 
     /**
      * 解析 JSON 响应
+     * 负责将大模型返回的字符串解析为Java对象
+     * 大模型不一定返回纯正的JSON格式，可能会带上多余的说明。
+     * 单独封装是为了方便统一异常处理，避免让整个流程崩溃
      */
     private <T> T parseJsonResponse(String content, Class<T> clazz, String name) {
         try {
