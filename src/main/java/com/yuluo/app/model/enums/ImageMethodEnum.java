@@ -1,7 +1,7 @@
 package com.yuluo.app.model.enums;
 
 import lombok.Getter;
-// todo 图片扩展方式学习（第四章节）
+
 /**
  * 配图方式枚举
  * 扩展新的图片来源时，只需添加新的枚举值并设置正确的属性：

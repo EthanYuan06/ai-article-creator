@@ -105,6 +105,12 @@
             <artifactId>cos_api</artifactId>
             <version>5.6.227</version>
         </dependency>
+        <!-- OkHttp & Okio 版本兼容修复 -->
+        <dependency>
+            <groupId>com.squareup.okio</groupId>
+            <artifactId>okio</artifactId>
+            <version>3.9.0</version>
+        </dependency>
         <!-- Spring AI Alibaba Agent Framework -->
         <dependency>
             <groupId>com.alibaba.cloud.ai</groupId>

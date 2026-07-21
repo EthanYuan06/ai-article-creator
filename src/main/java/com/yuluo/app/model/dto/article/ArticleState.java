@@ -23,22 +23,22 @@ public class ArticleState implements Serializable {
     private String topic;
 
     /**
-     * 标题结果（智能体1输出）
+     * 标题结果（智能体 1输出）
      */
     private TitleResult title;
 
     /**
-     * 大纲结果（智能体2输出）
+     * 大纲结果（智能体 2输出）
      */
     private OutlineResult outline;
 
     /**
-     * 正文内容（智能体3输出）
+     * 正文内容（智能体 3输出）
      */
     private String content;
 
     /**
-     * 配图需求列表（智能体4输出）
+     * 配图需求列表（智能体 4输出）
      */
     private List<ImageRequirement> imageRequirements;
 

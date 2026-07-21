@@ -17,25 +17,29 @@ import com.yuluo.app.model.entity.User;
 import com.yuluo.app.model.enums.UserRoleEnum;
 import com.yuluo.app.model.vo.LoginUserVO;
 import com.yuluo.app.model.vo.UserVO;
+import com.yuluo.app.service.CosService;
 import com.yuluo.app.service.UserService;
-import com.yuluo.app.util.CosUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.yuluo.app.constant.UserConstant.USER_LOGIN_STATE;
 
 @Service
+@Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Resource
-    private CosUtils cosUtils;
+    private CosService cosService;
 
     @Value("${PASSWORD_SALT}")
     private String salt;
@@ -309,21 +313,74 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public boolean uploadAvatar(MultipartFile file, Long userId) {
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID不能为空");
         
-        // 1. 构建上传路径
-        String uploadPathPrefix = "avatar/" + userId;
+        // 1. 校验文件
+        validatePicture(file);
         
-        // 2. 调用COS工具类上传
-        String url = cosUtils.uploadPicture(file, uploadPathPrefix);
+        File tempFile = null;
+        try {
+            // 2. 转换为临时File
+            String originalFilename = file.getOriginalFilename();
+            String suffix = originalFilename != null && originalFilename.contains(".") 
+                    ? originalFilename.substring(originalFilename.lastIndexOf('.')) 
+                    : ".png";
+            tempFile = File.createTempFile("upload_", suffix);
+            file.transferTo(tempFile);
+            
+            // 3. 构建上传路径
+            String uploadPathPrefix = "avatar/" + userId;
+            
+            // 4. 调用CosService上传
+            String url = cosService.uploadFile(tempFile, uploadPathPrefix);
+            
+            if (url == null) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+            }
 
-        // 3. 更新数据库
-        User user = new User();
-        user.setId(userId);
-        user.setUserAvatar(url);
-        boolean result = updateById(user);
-        if (!result){
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新头像失败");
+            // 5. 更新数据库
+            User user = new User();
+            user.setId(userId);
+            user.setUserAvatar(url);
+            boolean result = updateById(user);
+            if (!result){
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新头像失败");
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("上传头像失败", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+        } finally {
+            // 6. 删除临时文件
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
         }
-        return true;
+    }
+
+    /**
+     * 校验图片文件
+     *
+     * @param file 上传的文件
+     */
+    private void validatePicture(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件不能为空");
+        }
+
+        // 校验文件大小（5MB）
+        long fileSize = file.getSize();
+        if (fileSize > 5 * 1024 * 1024) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小不能超过5MB");
+        }
+
+        // 校验文件格式
+        String originalFilename = file.getOriginalFilename();
+        String suffix = originalFilename != null && originalFilename.contains(".")
+                ? originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase()
+                : "";
+        List<String> allowedFormats = Arrays.asList("jpg", "jpeg", "png", "webp");
+        if (!allowedFormats.contains(suffix)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持的图片格式");
+        }
     }
 
     /**

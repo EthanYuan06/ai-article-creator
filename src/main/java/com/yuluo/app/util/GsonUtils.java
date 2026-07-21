@@ -7,22 +7,27 @@ import com.google.gson.reflect.TypeToken;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Type;
-// todo 理解Gson格式转换工具类
+
 /**
  * Gson 工具类
- * 提供统一的 Gson 实例，避免重复创建
+ * 设计思路及好处：
+ * 1、工具类不需要实例，通过私有构造函数防止被 new
+ * 2、提供静态方法，方便直接调用
+ * 3、提供安全方法，避免 JSON 解析失败
  */
 @Slf4j
 public class GsonUtils {
 
     /**
      * 单例 Gson 实例
+     * 线程安全，可全局共享
+     * 避免重复创建，提升性能
      */
     private static final Gson GSON = new GsonBuilder()
             .create();
 
     private GsonUtils() {
-        // 私有构造函数，防止实例化
+        // 私有构造函数，确保不会 new GsonUtils()
     }
 
     /**
