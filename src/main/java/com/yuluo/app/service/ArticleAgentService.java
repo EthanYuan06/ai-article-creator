@@ -7,18 +7,20 @@ import com.yuluo.app.constant.PromptConstant;
 import com.yuluo.app.model.dto.article.ArticleState;
 import com.yuluo.app.model.enums.ImageMethodEnum;
 import com.yuluo.app.model.enums.SseMessageTypeEnum;
-import com.yuluo.app.util.GsonUtils;
+import com.yuluo.app.utils.GsonUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+@Service
 @Slf4j
 public class ArticleAgentService {
 
@@ -60,7 +62,7 @@ public class ArticleAgentService {
             generateImages(state, streamHandler);
             streamHandler.accept(SseMessageTypeEnum.AGENT5_COMPLETE.getValue());
             // 6. 图文合并：将图片插入正文
-            log.info("智能体6：开始合并图文，taskId = {}", state.getTaskId());
+            log.info("开始合并图文，taskId = {}", state.getTaskId());
             mergeImagesIntoContent(state);
             streamHandler.accept(SseMessageTypeEnum.MERGE_COMPLETE.getValue());
             log.info("文章生成完成，taskId = {}", state.getTaskId());
@@ -153,7 +155,7 @@ public class ArticleAgentService {
             // 调用图片检索服务
             // todo 图片搜索实现类待开发
             String imageUrl = imageSearchService.searchImage(requirement.getKeywords());
-            // 降级策略：如果搜不到图片，则记录当前检索方案，然后使用PICSUM随机图片进行占位
+            // 降级策略：如果搜不到图片，使用PICSUM随机图片进行占位
             ImageMethodEnum method = imageSearchService.getMethod();
             if (imageUrl == null){
                 imageUrl = imageSearchService.getFallbackImage(requirement.getPosition());
@@ -203,6 +205,7 @@ public class ArticleAgentService {
                 insertImageAfterSection(fullContent, images, sectionTitle);
             }
         }
+        state.setFullContent(fullContent.toString());
     }
 
     // region 辅助方法

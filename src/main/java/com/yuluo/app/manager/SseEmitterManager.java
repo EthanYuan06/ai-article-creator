@@ -63,7 +63,7 @@ public class SseEmitterManager {
     public void send(String taskId, String message) {
         // 根据taskId获取当前连接
         SseEmitter emitter = emitterMap.get(taskId);
-        if (emitter != null) {
+        if (emitter == null) {
             log.warn("发送消息时，SSE 连接不存在，taskId = {}", taskId);
             return;
         }
@@ -87,7 +87,7 @@ public class SseEmitterManager {
     public void complete(String taskId) {
         // 根据taskId获取当前连接
         SseEmitter emitter = emitterMap.get(taskId);
-        if (emitter != null) {
+        if (emitter == null) {
             log.warn("连接释放时，SSE 连接不存在，taskId = {}", taskId);
             return;
         }

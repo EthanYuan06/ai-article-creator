@@ -18,6 +18,8 @@ import com.yuluo.app.model.entity.User;
 import com.yuluo.app.model.vo.LoginUserVO;
 import com.yuluo.app.model.vo.UserVO;
 import com.yuluo.app.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/user")
+@Tag(name = "用户接口")
 public class UserController {
 
     @Resource
@@ -34,6 +37,7 @@ public class UserController {
      * 用户注册
      */
     @PostMapping("/register")
+    @Operation(summary = "用户注册")
     public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
         ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
         String userAccount = userRegisterRequest.getUserAccount();
@@ -47,6 +51,7 @@ public class UserController {
      * 用户登录
      */
     @PostMapping("/login")
+    @Operation(summary = "用户登录")
     public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userLoginRequest == null, ErrorCode.PARAMS_ERROR);
         String userAccount = userLoginRequest.getUserAccount();
@@ -59,6 +64,7 @@ public class UserController {
      * 获取当前登录用户
      */
     @GetMapping("/get/login")
+    @Operation(summary = "获取当前登录用户")
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(userService.getLoginUserVO(loginUser));
@@ -68,6 +74,7 @@ public class UserController {
      * 用户注销
      */
     @PostMapping("/logout")
+    @Operation(summary = "用户注销")
     public BaseResponse<Boolean> userLogout(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.userLogout(request);
@@ -79,6 +86,7 @@ public class UserController {
      */
     @PostMapping("/add")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "创建用户")
     public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
         ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
         long result = userService.addUser(userAddRequest);
@@ -90,6 +98,7 @@ public class UserController {
      */
     @PostMapping("/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "删除用户")
     public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
         ThrowUtils.throwIf(deleteRequest == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.deleteUser(deleteRequest);
@@ -100,6 +109,7 @@ public class UserController {
      * 更新用户
      */
     @PostMapping("/update")
+    @Operation(summary = "更新用户")
     public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userUpdateRequest == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.updateUser(userUpdateRequest, request);
@@ -111,6 +121,7 @@ public class UserController {
      */
     @GetMapping("/get")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "根据ID获取用户详情")
     public BaseResponse<User> getUserById(@RequestParam("id") Long id) {
         ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
         User user = userService.getUserById(id);
@@ -121,6 +132,7 @@ public class UserController {
      * 根据 ID 获取用户视图对象
      */
     @GetMapping("/get/vo")
+    @Operation(summary = "获取用户信息")
     public BaseResponse<UserVO> getUserVOById(@RequestParam("id") Long id) {
         ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
         UserVO userVO = userService.getUserVOById(id);
@@ -132,6 +144,7 @@ public class UserController {
      */
     @PostMapping("/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @Operation(summary = "分页查询用户列表")
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest) {
         ThrowUtils.throwIf(userQueryRequest == null, ErrorCode.PARAMS_ERROR);
         Page<UserVO> userVOPage = userService.listUserVOByPage(userQueryRequest);
@@ -142,6 +155,7 @@ public class UserController {
      * 上传用户头像
      */
     @PostMapping("/avatar/upload")
+    @Operation(summary = "上传头像")
     public BaseResponse<Boolean> uploadAvatar(
             @RequestParam("file") MultipartFile file,
             @RequestParam("id") Long id,

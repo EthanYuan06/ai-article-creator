@@ -1,4 +1,4 @@
-package com.yuluo.app.util;
+package com.yuluo.app.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

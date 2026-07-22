@@ -5,6 +5,7 @@ import com.yuluo.app.model.enums.ImageMethodEnum;
 /**
  * 图片检索服务接口
  * 抽象图片检索逻辑，便于扩展多种图片来源（如 Pexels、Unsplash、AI 生图等）
+ * 每个图片检索实现类都要实现以下三个方法
  */
 public interface ImageSearchService {
 
