@@ -1,6 +1,5 @@
 package com.yuluo.app.service;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.yuluo.app.constant.PromptConstant;
@@ -9,10 +8,14 @@ import com.yuluo.app.model.enums.ImageMethodEnum;
 import com.yuluo.app.model.enums.SseMessageTypeEnum;
 import com.yuluo.app.utils.GsonUtils;
 import jakarta.annotation.Resource;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -25,7 +28,7 @@ import java.util.function.Consumer;
 public class ArticleAgentService {
 
     @Resource
-    private DashScopeChatModel chatModel;
+    private DeepSeekChatModel chatModel;
 
     @Resource
     private CosService cosService;
@@ -43,29 +46,56 @@ public class ArticleAgentService {
         try {
             // 1. 生成标题
             log.info("智能体1：开始生成标题，taskId = {}", state.getTaskId());
+            long stepStart = System.currentTimeMillis();
             generateTitle(state);
+            log.info("[耗时统计] taskId={}, 阶段=智能体1-标题生成, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.AGENT1_COMPLETE.getValue());
             // 2. 生成大纲（流式输出）
             log.info("智能体2：开始生成大纲，taskId = {}", state.getTaskId());
+            stepStart = System.currentTimeMillis();
             generateOutline(state, streamHandler);
+            log.info("[耗时统计] taskId={}, 阶段=智能体2-生成大纲, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.TITLES_GENERATED.getValue());
             // 3. 生成正文（流式输出）
             log.info("智能体3：开始生成正文，taskId = {}", state.getTaskId());
+            stepStart = System.currentTimeMillis();
             generateContent(state, streamHandler);
+            log.info("[耗时统计] taskId={}, 阶段=智能体3-生成正文, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.OUTLINE_GENERATED.getValue());
             // 4. 配图分析
             log.info("智能体4：开始分析配图需求，taskId = {}", state.getTaskId());
+            stepStart = System.currentTimeMillis();
             analyzeImageRequirements(state);
+            log.info("[耗时统计] taskId={}, 阶段=智能体4-分析配图需求, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.AGENT4_COMPLETE.getValue());
             // 5. 配图生成（流式输出）
             log.info("智能体5：开始生成配图，taskId = {}", state.getTaskId());
+            stepStart = System.currentTimeMillis();
             generateImages(state, streamHandler);
+            log.info("[耗时统计] taskId={}, 阶段=智能体5-生成配图, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.AGENT5_COMPLETE.getValue());
             // 6. 图文合并：将图片插入正文
             log.info("开始合并图文，taskId = {}", state.getTaskId());
+            stepStart = System.currentTimeMillis();
             mergeImagesIntoContent(state);
+            log.info("[耗时统计] taskId={}, 阶段=图文合并, 耗时={}ms", 
+                    state.getTaskId(), System.currentTimeMillis() - stepStart);
             streamHandler.accept(SseMessageTypeEnum.MERGE_COMPLETE.getValue());
             log.info("文章生成完成，taskId = {}", state.getTaskId());
+            // 输出总Token统计
+            if (state.getTotalTokenUsage() != null) {
+                ArticleState.TotalTokenUsage totalUsage = state.getTotalTokenUsage();
+                log.info("========== [Token总统计] taskId={}, 总输入={}, 总输出={}, 总计={} ==========",
+                        state.getTaskId(),
+                        totalUsage.getPromptTokens(),
+                        totalUsage.getCompletionTokens(),
+                        totalUsage.getTotalTokens());
+            }
         } catch (Exception e) {
             log.error("生成文章失败，taskId = {}", state.getTaskId(), e);
             throw new RuntimeException("生成文章失败" + e.getMessage(), e);
@@ -79,10 +109,12 @@ public class ArticleAgentService {
         // 将标题嵌入到提示词中
         String prompt = PromptConstant.AGENT1_TITLE_PROMPT.replace("{topic}", state.getTopic());
         // 同步调用LLM
-        String content = callLlm(prompt);
+        LlmResult result = callLlm(prompt);
+        // 记录Token消耗
+        recordTokenUsage(state, "智能体1-标题生成", result.getUsage());
         // 将结果转换为JSON，保存到state中
         ArticleState.TitleResult titleResult =
-                parseJsonResponse(content, ArticleState.TitleResult.class, "标题");
+                parseJsonResponse(result.getContent(), ArticleState.TitleResult.class, "标题");
         state.setTitle(titleResult);
         log.info("智能体1：标题生成完成，mainTitle = {}", titleResult.getMainTitle());
     }
@@ -96,10 +128,12 @@ public class ArticleAgentService {
                 .replace("{mainTitle}", state.getTitle().getMainTitle())
                 .replace("{subTitle}", state.getTitle().getSubTitle());
         // 流式调用LLM
-        String content = callLlmWithStreaming(prompt, streamHandler, SseMessageTypeEnum.OUTLINE_GENERATED);
+        LlmResult result = callLlmWithStreaming(prompt, streamHandler, SseMessageTypeEnum.OUTLINE_GENERATED);
+        // 记录Token消耗
+        recordTokenUsage(state, "智能体2-生成大纲", result.getUsage());
         // 将结果转换为JSON，保存到state中
         ArticleState.OutlineResult outlineResult =
-                parseJsonResponse(content, ArticleState.OutlineResult.class, "大纲");
+                parseJsonResponse(result.getContent(), ArticleState.OutlineResult.class, "大纲");
         state.setOutline(outlineResult);
         log.info("智能体2：大纲生成完成，总章节数 = {}", outlineResult.getSections().size());
     }
@@ -116,9 +150,11 @@ public class ArticleAgentService {
                 .replace("{subTitle}", state.getTitle().getSubTitle())
                 .replace("{outline}", outlineJson);
         // 流式调用LLM
-        String content = callLlmWithStreaming(prompt, streamHandler, SseMessageTypeEnum.AGENT3_STREAMING);
-        state.setContent(content);
-        log.info("智能体3：正文生成完成，总字数 = {}", content.length());
+        LlmResult result = callLlmWithStreaming(prompt, streamHandler, SseMessageTypeEnum.AGENT3_STREAMING);
+        // 记录Token消耗
+        recordTokenUsage(state, "智能体3-生成正文", result.getUsage());
+        state.setContent(result.getContent());
+        log.info("智能体3：正文生成完成，总字数 = {}", result.getContent().length());
     }
 
     /**
@@ -130,11 +166,13 @@ public class ArticleAgentService {
                 .replace("{mainTitle}", state.getTitle().getMainTitle())
                 .replace("{content}", state.getContent());
         // 调用LLM
-        String content = callLlm(prompt);
+        LlmResult result = callLlm(prompt);
+        // 记录Token消耗
+        recordTokenUsage(state, "智能体4-分析配图需求", result.getUsage());
         // 大模型返回JSON数组，构造成配图需求列表
         List<ArticleState.ImageRequirement> imageRequirements =
                 parseJsonListResponse(
-                        content,
+                        result.getContent(),
                         // 绕过Java泛型擦除，确保智能体5方法设计上更简洁易读，并保证类型安全
                         new TypeToken<List<ArticleState.ImageRequirement>>() {},
                         "配图需求");
@@ -211,18 +249,31 @@ public class ArticleAgentService {
     // region 辅助方法
 
     /**
+     * LLM调用结果（包含文本和Token用量）
+     */
+    @Data
+    @AllArgsConstructor
+    private static class LlmResult {
+        private String content;
+        private Usage usage;
+    }
+
+    /**
      * 调用 LLM（非流式）
      */
-    private String callLlm(String prompt) {
+    private LlmResult callLlm(String prompt) {
         ChatResponse response = chatModel.call(new Prompt(new UserMessage(prompt)));
-        return response.getResult().getOutput().getText();
+        String content = response.getResult().getOutput().getText();
+        Usage usage = response.getMetadata().getUsage();
+        return new LlmResult(content, usage);
     }
 
     /**
      * 调用 LLM（流式输出）
      */
-    private String callLlmWithStreaming(String prompt, Consumer<String> streamHandler, SseMessageTypeEnum messageType) {
+    private LlmResult callLlmWithStreaming(String prompt, Consumer<String> streamHandler, SseMessageTypeEnum messageType) {
         StringBuilder contentBuilder = new StringBuilder();
+        final Usage[] lastUsage = new Usage[1]; // 存储最后的usage
 
         Flux<ChatResponse> streamResponse = chatModel.stream(new Prompt(new UserMessage(prompt)));
 
@@ -233,11 +284,15 @@ public class ArticleAgentService {
                         contentBuilder.append(chunk);
                         streamHandler.accept(messageType.getStreamingPrefix() + chunk);
                     }
+                    // 保存最新的usage(流式最后一个包含完整统计)
+                    if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                        lastUsage[0] = response.getMetadata().getUsage();
+                    }
                 })
                 .doOnError(error -> log.error("LLM 流式调用失败, messageType={}", messageType, error))
                 .blockLast();
 
-        return contentBuilder.toString();
+        return new LlmResult(contentBuilder.toString(), lastUsage[0]);
     }
 
     /**
@@ -298,6 +353,36 @@ public class ArticleAgentService {
                 break;
             }
         }
+    }
+
+    /**
+     * 记录Token消耗并累加
+     */
+    private void recordTokenUsage(ArticleState state, String stageName, Usage usage) {
+        if (usage == null) {
+            log.warn("[Token统计] taskId={}, 阶段={}, Usage为空", state.getTaskId(), stageName);
+            return;
+        }
+
+        // 初始化TotalTokenUsage
+        if (state.getTotalTokenUsage() == null) {
+            state.setTotalTokenUsage(new ArticleState.TotalTokenUsage());
+        }
+
+        Integer promptTokens = usage.getPromptTokens();
+        Integer completionTokens = usage.getCompletionTokens();
+        Integer totalTokens = usage.getTotalTokens();
+
+        int prompt = promptTokens != null ? promptTokens : 0;
+        int completion = completionTokens != null ? completionTokens : 0;
+        int total = totalTokens != null ? totalTokens : 0;
+
+        // 累加到总用量
+        state.getTotalTokenUsage().addUsage(prompt, completion, total);
+
+        // 输出本阶段统计
+        log.info("[Token统计] taskId={}, 阶段={}, 输入={}, 输出={}, 总计={}",
+                state.getTaskId(), stageName, prompt, completion, total);
     }
 
     // endregion

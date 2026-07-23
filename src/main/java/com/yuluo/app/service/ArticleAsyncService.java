@@ -13,6 +13,10 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 文章生成异步服务
+ * 这里存放异步方法
+ */
 @Service
 @Slf4j
 public class ArticleAsyncService {
@@ -31,6 +35,7 @@ public class ArticleAsyncService {
      */
     @Async("articleExecutor")
     public void executeArticleGeneration(String taskId, String topic) {
+        long startTime = System.currentTimeMillis();
         log.info("开始执行文章生成任务：选题：{}，任务：{}", topic, taskId);
         try {
             // 更新状态为处理中
@@ -51,7 +56,10 @@ public class ArticleAsyncService {
             sendSseMessage(taskId, SseMessageTypeEnum.ALL_COMPLETE, Map.of("taskId", taskId));
             // 释放连接
             sseEmitterManager.complete(taskId);
-            log.info("文章生成任务执行成功：{}", taskId);
+
+            long endTime = System.currentTimeMillis();
+            long totalTime = endTime - startTime;
+            log.info("[耗时统计] 文章生成任务完成，taskId={}, 总耗时={}ms", taskId, totalTime);
         } catch (Exception e) {
             log.error("文章生成任务执行失败：{}", taskId, e);
             articleService.updateArticleStatus(taskId, ArticleStatusEnum.FAILED, e.getMessage());

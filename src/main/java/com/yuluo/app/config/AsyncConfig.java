@@ -19,18 +19,22 @@ public class AsyncConfig {
         // 创建线程池：ThreadPoolTaskExecutor是Spring对JDK提供ThreadPoolExecutor的高级封装
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         // 核心线程数：空闲不回收，常态下最多能同时处理5个文章生成任务
+        // todo 为什么核心线程设置为5
         executor.setCorePoolSize(5);
         // 最大线程数：队列满时，会新增线程到最大值，高峰期最多能同时处理10个文章生成任务
+        // todo 为什么最大线程设置为10
         executor.setMaxPoolSize(10);
         // 队列长度：最多缓存100个任务
+        // todo 为什么设置队列长度为100，不能是20或者1000吗
         executor.setQueueCapacity(100);
         // 拒绝策略：由Tomcat线程阻塞同步处理，避免任务丢失（默认是AbortPolicy，直接抛异常）
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         // 线程名称前缀
+        // todo 设置名称前缀有啥用
         executor.setThreadNamePrefix("article-async-");
         // 等待所有任务完成后，关闭线程池
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        // 设置等待时间
+        // 设置等待时间，允许关闭线程池后60s内将线程全部释放
         executor.setAwaitTerminationSeconds(60);
         // 初始化线程池
         executor.initialize();

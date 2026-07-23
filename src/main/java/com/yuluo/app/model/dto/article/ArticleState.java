@@ -57,6 +57,11 @@ public class ArticleState implements Serializable {
      */
     private String fullContent;
 
+    /**
+     * Token消耗统计
+     */
+    private TotalTokenUsage totalTokenUsage;
+
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -109,5 +114,24 @@ public class ArticleState implements Serializable {
         private String keywords;
         private String sectionTitle;
         private String description;
+    }
+
+    /**
+     * Token消耗统计
+     */
+    @Data
+    public static class TotalTokenUsage implements Serializable {
+        private int promptTokens;
+        private int completionTokens;
+        private int totalTokens;
+
+        /**
+         * 累加Usage
+         */
+        public void addUsage(int promptTokens, int completionTokens, int totalTokens) {
+            this.promptTokens += promptTokens;
+            this.completionTokens += completionTokens;
+            this.totalTokens += totalTokens;
+        }
     }
 }

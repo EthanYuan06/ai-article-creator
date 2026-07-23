@@ -2,8 +2,8 @@ spring:
   application:
     name: ai-article-creator
   ai:
-    dashscope:
-      api-key: ${DASHSCOPE_API_KEY}
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY}
   servlet:
     multipart:
       max-file-size: 5MB
